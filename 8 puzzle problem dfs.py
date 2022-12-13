@@ -1,139 +1,94 @@
-import sys
-import numpy as np
+def print_b(src):
+    state = src.copy()
+    state[state.index(-1)] = ' '
+    print(
+        f"""
+{state[0]} {state[1]} {state[2]}
+{state[3]} {state[4]} {state[5]}
+{state[6]} {state[7]} {state[8]}
+        """
+    )
 
 
-class Node:
-	def __init__(self, state, parent, action):
-		self.state = state
-		self.parent = parent
-		self.action = action
+def h(state, target):
+    count = 0
+    i = 0
+    for j in state:
+        if state[i] != target[i]:
+            count = count+1
+    return count
 
 
-class StackFrontier:
-	def __init__(self):
-		self.frontier = []
-
-	def add(self, node):
-		self.frontier.append(node)
-
-	def contains_state(self, state):
-		return any((node.state[0] == state[0]).all() for node in self.frontier)
-	
-	def empty(self):
-		return len(self.frontier) == 0
-	
-	def remove(self):
-		if self.empty():
-			raise Exception("Empty Frontier")
-		else:
-			node = self.frontier[-1]
-			self.frontier = self.frontier[:-1]
-			return node
-
-
-class QueueFrontier(StackFrontier):
-	def remove(self):
-		if self.empty():
-			raise Exception("Empty Frontier")
-		else:
-			node = self.frontier[0]
-			self.frontier = self.frontier[1:]
-			return node
+def astar(state, target):  # Add inputs if more are required
+    states = [src]
+    g = 0
+    visited_states = []
+    while len(states):
+        print(f"Level: {g}")
+        moves = []
+        for state in states:
+            visited_states.append(state)
+            print_b(state)
+            if state == target:
+                print("Success")
+                return
+            moves += [move for move in possible_moves(
+                state, visited_states) if move not in moves]
+        costs = [g + h(move, target) for move in moves]
+        states = [moves[i]
+                  for i in range(len(moves)) if costs[i] == min(costs)]
+        g += 1
+    print("Fail")
 
 
-class Puzzle:
-	def __init__(self, start, startIndex, goal, goalIndex):
-		self.start = [start, startIndex]
-		self.goal = [goal, goalIndex] 
-		self.solution = None
+def possible_moves(state, visited_state):  # Add inputs if more are required
+    # Find index of empty spot and assign it to b
+    b = state.index(-1)
 
-	def neighbors(self, state):
-		mat, (row, col) = state
-		results = []
-		
-		if row > 0:
-			mat1 = np.copy(mat)
-			mat1[row][col] = mat1[row - 1][col]
-			mat1[row - 1][col] = 0
-			results.append(('up', [mat1, (row - 1, col)]))
-		if col > 0:
-			mat1 = np.copy(mat)
-			mat1[row][col] = mat1[row][col - 1]
-			mat1[row][col - 1] = 0
-			results.append(('left', [mat1, (row, col - 1)]))
-		if row < 2:
-			mat1 = np.copy(mat)
-			mat1[row][col] = mat1[row + 1][col]
-			mat1[row + 1][col] = 0
-			results.append(('down', [mat1, (row + 1, col)]))
-		if col < 2:
-			mat1 = np.copy(mat)
-			mat1[row][col] = mat1[row][col + 1]
-			mat1[row][col + 1] = 0
-			results.append(('right', [mat1, (row, col + 1)]))
+    # 'd' for down, 'u' for up, 'r' for right, 'l' for left - directions array
+    d = []
 
-		return results
+    # Add all possible direction into directions array - Hint using if statements
+    if b - 3 in range(9):
+        d.append('u')
+    if b not in [0, 3, 6]:
+        d.append('l')
+    if b not in [2, 5, 8]:
+        d.append('r')
+    if b + 3 in range(9):
+        d.append('d')
 
-	def print(self):
-		solution = self.solution if self.solution is not None else None
-		print("Start State:\n", self.start[0], "\n")
-		print("Goal State:\n",  self.goal[0], "\n")
-		print("\nStates Explored: ", self.num_explored, "\n")
-		print("Solution:\n ")
-		for action, cell in zip(solution[0], solution[1]):
-			print("action: ", action, "\n", cell[0], "\n")
-		print("Goal Reached!!")
+    # If direction is possible then add state to move
+    pos_moves = []
 
-	def does_not_contain_state(self, state):
-		for st in self.explored:
-			if (st[0] == state[0]).all():
-				return False
-		return True
-	
-	def solve(self):
-		self.num_explored = 0
+    # for all possible directions find the state if that move is played
+    # Jump to gen function to generate all possible moves in the given directions
+    for m in d:
+        pos_moves.append(gen(state, m, b))
 
-		start = Node(state=self.start, parent=None, action=None)
-		frontier = QueueFrontier()
-		frontier.add(start)
-
-		self.explored = [] 
-
-		while True:
-			if frontier.empty():
-				raise Exception("No solution")
-
-			node = frontier.remove()
-			self.num_explored += 1
-
-			if (node.state[0] == self.goal[0]).all():
-				actions = []
-				cells = []
-				while node.parent is not None:
-					actions.append(node.action)
-					cells.append(node.state)
-					node = node.parent
-				actions.reverse()
-				cells.reverse()
-				self.solution = (actions,  cells)
-				return
-
-			self.explored.append(node.state)
-
-			for action, state in self.neighbors(node.state):
-				if not frontier.contains_state(state) and self.does_not_contain_state(state):
-					child = Node(state=state, parent=node, action=action)
-					frontier.add(child)
+    # return all possible moves only if the move not in visited_states
+    return [move for move in pos_moves if move not in visited_state]
 
 
-start = np.array([[1, 2, 3], [8, 0, 4], [7, 6, 5]])
-goal = np.array([[2, 8, 1], [0, 4, 3], [7, 6, 5]])
+def gen(state, m, b):
+    temp = state.copy()
+
+    # if move is to slide empty spot to the left and so on
+    if m == 'u':
+        temp[b - 3], temp[b] = temp[b], temp[b - 3]
+    if m == 'l':
+        temp[b - 1], temp[b] = temp[b], temp[b - 1]
+    if m == 'r':
+        temp[b + 1], temp[b] = temp[b], temp[b + 1]
+    if m == 'd':
+        temp[b + 3], temp[b] = temp[b], temp[b + 3]
+
+    # return new state with tested move to later check if "src == target"
+    return temp
 
 
-startIndex = (1, 1)
-goalIndex = (1, 0)
+# Test 1
+src = [1, 2, 3, -1, 4, 5, 6, 7, 8]
+target = [1, 2, 3, 4, 5,6, 7, 8,-1]
 
-
-p = Puzzle(start, startIndex, goal, goalIndex)
-p.solve()
-p.print()
+astar(src, target)
